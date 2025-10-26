@@ -325,15 +325,6 @@ int main(int argc, char* argv[])
     if      (program.get<bool>("delete")) { choice = 1; }
     else if (program.get<bool>("move"))   { choice = 2; }
 
-    if (program.get<bool>("prompt")) {
-        std::cout << "\nWhat would you like to do with corrupted files?" << std::endl;
-        std::cout << "0. Do nothing" << std::endl;
-        std::cout << "1. Delete them permanently" << std::endl;
-        std::cout << "2. Move them to 'corrupted_images' folder" << std::endl;
-        std::cout << "Choice (0/1/2): ";
-
-        std::cin >> choice;
-    }
 
     std::string inputPath = program.get<std::string>("input");
     std::vector<std::string> images;
@@ -345,6 +336,16 @@ int main(int argc, char* argv[])
     results.reserve(images.size());
 
     processImages(images);
+
+    if (program.get<bool>("prompt")) {
+        std::cout << "\nWhat would you like to do with corrupted files?" << std::endl;
+        std::cout << "0. Do nothing" << std::endl;
+        std::cout << "1. Delete them permanently" << std::endl;
+        std::cout << "2. Move them to 'corrupted_images' folder" << std::endl;
+        std::cout << "Choice (0/1/2): ";
+
+        std::cin >> choice;
+    }
 
     if (corruptedCount > 0) {
         switch (choice) {
