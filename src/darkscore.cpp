@@ -21,7 +21,6 @@ struct DarkScoreResult {
     double score;
 };
 
-
 std::vector<DarkScoreResult> results;
 std::mutex resultsMutex;
 
@@ -42,7 +41,6 @@ double computeDarkness(const std::string& imagePath)
 void processImages(std::vector<std::string>& images)
 {
     auto startTime = std::chrono::high_resolution_clock::now();
-
 
     // results.reserve(totalCount);
 
@@ -181,7 +179,6 @@ int main(int argc, char* argv[])
         .required()
         .help("Path to output CSV file");
 
-
     program.add_argument("-s", "-sd", "--sort", "--sortd")
         .default_value(false)
         .implicit_value(true)
@@ -219,7 +216,6 @@ int main(int argc, char* argv[])
         std::sort(results.begin(), results.end(), [](auto& a, auto& b) { return a.score < b.score; });
     }
 
-
     std::string outputPath = program.get<std::string>("--output");
     if (!outputPath.empty()) {
         bool fileExists = std::ifstream(outputPath).good();
@@ -227,6 +223,9 @@ int main(int argc, char* argv[])
         if (!fileExists) {
             out << "image,darkness\n";
         }
+
+        std::cout << std::fixed << std::setprecision(6);
+        out << std::fixed << std::setprecision(6);
 
         for (const auto& result : results) {
             if (result.score >= 0) {
