@@ -412,21 +412,26 @@ int main(int argc, char* argv[])
                 }
                 catch (const std::exception& e) {
                     std::cerr << "Error in loop: " << e.what() << std::endl;
-                    std::this_thread::sleep_for(std::chrono::seconds(60)); // Wait before retrying
+                    std::this_thread::sleep_for(std::chrono::seconds(2)); // Wait before retrying
                 }
             }
         });
 
-        while (g_running) {
-
-            char c;
-            if (checkKeyPress(&c)) {
-                g_sleeping = false;
-                g_sleep_cv.notify_all();
-            }
-
-            if (c == 'q') { break; }
+        if (isDaemon) {
+            logicThread.join();
         }
+        else {
+            while (g_running) {
+                char c;
+                if (checkKeyPress(&c)) {
+                    g_sleeping = false;
+                    g_sleep_cv.notify_all();
+                }
+
+                if (c == 'q') { break; }
+            }
+        }
+
         g_running = false;
         g_sleeping = false;
         g_sleep_cv.notify_all();
