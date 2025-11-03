@@ -8,8 +8,10 @@
 #include <iostream>
 #include <mutex>
 #include <opencv2/opencv.hpp>
+#include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include "debug.hpp"
@@ -38,14 +40,49 @@ double computeDarkness(const std::string& imagePath)
     return 1.0 - (avg_brightness / 255.0);
 }
 
+// Load existing results from CSV
+std::unordered_map<std::string, double> loadExistingResults(const std::string& csvPath)
+{
+    std::unordered_map<std::string, double> cache;
+    std::ifstream inFile(csvPath);
+
+    if (!inFile.is_open()) {
+        return cache;
+    }
+
+    std::string line;
+    // Skip header
+    std::getline(inFile, line);
+
+    while (std::getline(inFile, line)) {
+        if (line.empty()) continue;
+
+        size_t delimPos = line.find(CSV_DELIM);
+        if (delimPos != std::string::npos) {
+            std::string imagePath = line.substr(0, delimPos);
+            std::string scoreStr = line.substr(delimPos + 1);
+
+            try {
+                double score = std::stod(scoreStr);
+                cache[imagePath] = score;
+            }
+            catch (const std::exception& e) {
+                // Skip invalid lines
+                continue;
+            }
+        }
+    }
+
+    inFile.close();
+    return cache;
+}
+
 void processImages(std::vector<std::string>& images)
 {
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    // results.reserve(totalCount);
-
     int numThreads = std::thread::hardware_concurrency();
-    if (numThreads == 0) numThreads = 4; // Fallback in case detection fails
+    if (numThreads == 0) numThreads = 4;
 
     std::cout << "Using " << numThreads << " threads for processing." << std::endl;
 
@@ -62,9 +99,8 @@ void processImages(std::vector<std::string>& images)
         std::chrono::steady_clock::time_point prev_time = start_time;
         size_t prev_processed = 0;
 
-        // Moving average for i/s calculation
         std::vector<double> speed_samples;
-        const size_t max_samples = 10; // Average over last 10 samples
+        const size_t max_samples = 10;
         float top_speed = 0.0f;
 
         while (running) {
@@ -75,13 +111,11 @@ void processImages(std::vector<std::string>& images)
                 std::chrono::duration<double> elapsed_time = now - start_time;
                 std::chrono::duration<double> time_delta = now - prev_time;
 
-                // Calculate instantaneous speed
                 double instant_speed = 0.0;
                 if (time_delta.count() > 0) {
                     instant_speed = (current - prev_processed) / time_delta.count();
                 }
 
-                // Add to moving average (only if we processed some)
                 if (current > prev_processed) {
                     speed_samples.push_back(instant_speed);
                     if (speed_samples.size() > max_samples) {
@@ -89,7 +123,6 @@ void processImages(std::vector<std::string>& images)
                     }
                 }
 
-                // Calculate averaged speed
                 double avg_speed = 0.0;
                 if (!speed_samples.empty()) {
                     double sum = 0.0;
@@ -104,7 +137,6 @@ void processImages(std::vector<std::string>& images)
 
                 float p = static_cast<float>(current) / static_cast<float>(totalImages);
 
-                // Calculate ETA
                 std::string eta_str = "";
                 if (avg_speed > 0 && current < totalImages) {
                     double remaining_time = (totalImages - current) / avg_speed;
@@ -153,7 +185,6 @@ void processImages(std::vector<std::string>& images)
         }
     }
 
-    // stop print thread
     running = false;
     printThread.join();
 
@@ -168,7 +199,7 @@ void processImages(std::vector<std::string>& images)
 
 int main(int argc, char* argv[])
 {
-    freopen("/dev/null", "w", stderr); // suppress errors
+    freopen("/dev/null", "w", stderr);
 
     argparse::ArgumentParser program("darkscore", VERSION);
     program.add_description("give darkness score for wallpapers");
@@ -199,15 +230,78 @@ int main(int argc, char* argv[])
     }
 
     std::string inputPath = program.get<std::string>("--input");
-    std::vector<std::string> images;
-    getImages(images, inputPath);
-    if (images.empty()) {
+    std::string outputPath = program.get<std::string>("--output");
+
+    // Load existing results from CSV
+    std::unordered_map<std::string, double> cachedResults = loadExistingResults(outputPath);
+
+    int cached_count = 0;
+    int removed_count = 0;
+    int new_count = 0;
+
+    if (!cachedResults.empty()) {
+        std::cout << "Loaded " << cachedResults.size() << " cached results from " << outputPath << std::endl;
+
+        // Remove entries for files that no longer exist
+        for (auto it = cachedResults.begin(); it != cachedResults.end();) {
+            if (!std::filesystem::exists(it->first)) {
+                it = cachedResults.erase(it);
+                removed_count++;
+            }
+            else {
+                ++it;
+            }
+        }
+
+        if (removed_count > 0) {
+            std::cout << "Removed " << removed_count << " entries for non-existent files" << std::endl;
+        }
+    }
+
+    // Get all images from input
+    std::vector<std::string> allImages;
+    getImages(allImages, inputPath);
+    if (allImages.empty()) {
         std::cout << "No valid images found." << std::endl;
         return 1;
     }
 
-    processImages(images);
+    // Separate images into cached and new
+    std::vector<std::string> imagesToProcess;
+    for (const auto& imgPath : allImages) {
+        std::string absPath = std::filesystem::canonical(imgPath);
 
+        if (cachedResults.find(absPath) != cachedResults.end()) {
+            // Already cached, add to results
+            DarkScoreResult result;
+            result.filePath = absPath;
+            result.score = cachedResults[absPath];
+            results.push_back(result);
+            cached_count++;
+        }
+        else {
+            // Need to process
+            imagesToProcess.push_back(imgPath);
+            new_count++;
+        }
+    }
+
+    std::cout << "Images summary:" << std::endl;
+    std::cout << "  Cached: " << cached_count << std::endl;
+    std::cout << "  New to process: " << new_count << std::endl;
+    std::cout << "  Removed (deleted files): " << removed_count << std::endl;
+    std::cout << "  Total: " << (cached_count + new_count) << std::endl;
+
+    // Process only new images
+    if (!imagesToProcess.empty()) {
+        std::cout << "\nProcessing " << imagesToProcess.size() << " new images..." << std::endl;
+        processImages(imagesToProcess);
+    }
+    else {
+        std::cout << "\nNo new images to process!" << std::endl;
+    }
+
+    // Sort if requested
     if (program.get<bool>("--sort") || program.get<bool>("--sortd")) {
         std::sort(results.begin(), results.end(), [](auto& a, auto& b) { return a.score > b.score; });
     }
@@ -216,27 +310,27 @@ int main(int argc, char* argv[])
         std::sort(results.begin(), results.end(), [](auto& a, auto& b) { return a.score < b.score; });
     }
 
-    std::string outputPath = program.get<std::string>("--output");
+    // Write results
     if (!outputPath.empty()) {
-        bool fileExists = std::ifstream(outputPath).good();
         std::ofstream out(outputPath);
-        if (!fileExists) {
-            out << "image,darkness\n";
-        }
+        out << "image,darkness\n";
 
         std::cout << std::fixed << std::setprecision(6);
         out << std::fixed << std::setprecision(6);
 
         for (const auto& result : results) {
             if (result.score >= 0) {
-                std::string abs = std::filesystem::canonical(result.filePath);
-                std::cout << abs << " => " << result.score << std::endl;
-                out << abs << CSV_DELIM << result.score << "\n";
+                std::cout << result.filePath << " => " << result.score << std::endl;
+                out << result.filePath << CSV_DELIM << result.score << "\n";
             }
         }
 
         out.close();
-        std::cout << "Results written to " << outputPath << std::endl;
+        std::cout << "\nResults written to " << outputPath << std::endl;
+        std::cout << "Final summary:" << std::endl;
+        std::cout << "  Total entries in CSV: " << results.size() << std::endl;
+        std::cout << "  New entries added: " << new_count << std::endl;
+        std::cout << "  Entries removed: " << removed_count << std::endl;
     }
 
     return 0;
