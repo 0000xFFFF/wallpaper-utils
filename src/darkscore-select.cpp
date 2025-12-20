@@ -97,19 +97,35 @@ int getDarknessBucket(double score)
     return 5;
 }
 
+// function now returns dark wallpapers during the day aswell
+// but during the night you won't see bright wallpapers
 int getTargetBucketForHour(int hour)
 {
-    if (hour >= 21) return 0; // very dark
-    if (hour >= 20) return 1; // dark
-    if (hour >= 17) return 2; // mid-dark
-    if (hour >= 16) return 3; // mid-bright
-    if (hour >= 15) return 4; // bright
-    if (hour >= 12) return 5; // very bright
-    if (hour >= 9) return 2;  // bright
-    if (hour >= 7) return 2;  // mid-dark
-    if (hour >= 5) return 1;  // dark
-    if (hour >= 0) return 0;  // very dark
-    return 0;
+    int bucket = 0;
+    // clang-format off
+    if      (hour >= 21) bucket = 0; // very dark
+    else if (hour >= 20) bucket = 1; // dark
+    else if (hour >= 17) bucket = 2; // mid-dark
+    else if (hour >= 16) bucket = 3; // mid-bright
+    else if (hour >= 15) bucket = 4; // bright
+    else if (hour >= 12) bucket = 5; // very bright
+    else if (hour >= 9)  bucket = 2; // bright
+    else if (hour >= 7)  bucket = 2; // mid-dark
+    else if (hour >= 5)  bucket = 1; // dark
+    else if (hour >= 0)  bucket = 0; // very dark
+    // clang-format on
+
+
+    // very dark      = very dark
+    // dark           = very dark, dark
+    // mid-dark       = very dark, dark, mid-dark
+    // mid-bright     = very dark, dark, mid-dark, mid-bright
+    // bright         = very dark, dark, mid-dark, mid-bright, bright
+    // very bright    = very dark, dark, mid-dark, mid-bright, bright, very bright
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dist(0, static_cast<int>(bucket));
+    return dist(gen);
 }
 
 struct DarkScoreResult {
