@@ -64,3 +64,5 @@ clean:
 	rm wpu-palette wpu-grouper wpu-validator wpu-darkscore wpu-darkscore-select
 
 all: palette grouper validator darkscore darkscore-select
+
+release: all
