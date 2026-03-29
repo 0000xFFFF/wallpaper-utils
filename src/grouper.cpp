@@ -342,7 +342,7 @@ size_t scanFolderMakeStructs(const std::string& folderPath)
 {
     std::cout << "Scanning folder: " << folderPath << std::endl;
 
-    if (!std::filesystem::exists(folderPath)) {
+    if (!fs_exists(folderPath)) {
         std::cerr << "Error scanning folder: " << folderPath << std::endl;
         return 0;
     }

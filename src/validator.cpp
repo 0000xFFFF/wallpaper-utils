@@ -263,7 +263,7 @@ void moveCorruptedFiles(const std::string& quarantineFolder = "corrupted_images"
 
             // Handle filename conflicts
             int counter = 1;
-            while (std::filesystem::exists(destPath)) {
+            while (fs_exists(destPath)) {
                 std::string stem = sourcePath.stem().string();
                 std::string extension = sourcePath.extension().string();
                 destPath = std::filesystem::path(quarantineFolder) / (stem + "_" + std::to_string(counter) + extension);

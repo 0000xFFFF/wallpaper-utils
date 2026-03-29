@@ -27,7 +27,7 @@ size_t scanFolder(std::vector<std::string>& imageFiles, const std::string& folde
 {
     std::cout << "Scanning folder: " << folderPath << std::endl;
 
-    if (!std::filesystem::exists(folderPath)) {
+    if (!fs_exists(folderPath)) {
         std::cerr << "Error scanning folder: " << folderPath << std::endl;
         return 0;
     }
@@ -84,6 +84,7 @@ std::string formatTime(int seconds)
     }
 }
 
+// clang-format off
 namespace Cursor {
     void termClear() { std::cout << "\033[2J"; }
     void reset() { std::cout << "\033[H"; }
@@ -92,6 +93,7 @@ namespace Cursor {
     void cr() { std::cout << "\r" << std::flush; }
 
 }; // namespace Cursor
+// clang-format on
 
 std::vector<std::string> csv_split(const std::string& line, char delimiter)
 {
@@ -185,4 +187,14 @@ bool executeCommand(const std::string& program, const std::string& filePath)
         }
         return true;
     }
+}
+
+bool fs_exists(const std::string& path)
+{
+    try {
+        return std::filesystem::exists(path);
+    }
+    catch (...) {
+    }
+    return false;
 }

@@ -21,3 +21,4 @@ std::string trim(const std::string& str);
 void setNonBlockingInput(bool enable);
 bool checkKeyPress(char* c);
 bool executeCommand(const std::string& program, const std::string& filePath);
+bool fs_exists(const std::string& path);
